@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>远程开机</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100dvh; padding: 1rem;
+  }
+  .card {
+    background: #1e293b; border-radius: 1.5rem; padding: 2.5rem 2rem;
+    text-align: center; max-width: 360px; width: 100%;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  }
+  h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: .25rem; }
+  p.sub { color: #94a3b8; font-size: .875rem; margin-bottom: 2rem; }
+  .btn {
+    width: 120px; height: 120px; border-radius: 50%; border: none;
+    color: #fff; font-size: 1.1rem; font-weight: 700;
+    cursor: pointer; transition: all .2s;
+  }
+  .btn:hover { transform: scale(1.05); }
+  .btn:active { transform: scale(.95); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn.wake {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    box-shadow: 0 4px 24px rgba(59,130,246,.4);
+    margin-bottom: 1rem;
+  }
+  .btn.wake:hover { box-shadow: 0 6px 32px rgba(59,130,246,.6); }
+  .btn.wake.sent { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 4px 24px rgba(34,197,94,.4); }
+  .btn-row { display: flex; gap: 1rem; justify-content: center; margin-bottom: 1.5rem; }
+  .status { font-size: .875rem; color: #94a3b8; min-height: 1.5rem; }
+  .status.online { color: #22c55e; }
+  .status.offline { color: #ef4444; }
+  .status.sending { color: #facc15; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⚡ 远程开机</h1>
+  <p class="sub">唤醒家中 Windows 电脑</p>
+  <button class="btn wake" id="wakeBtn" onclick="wake()">开 机</button>
+  <p class="status" id="status">检查主机状态...</p>
+</div>
+<script>
+async function checkStatus() {
+  const el = document.getElementById('status');
+  try {
+    const r = await fetch('/status');
+    const d = await r.json();
+    el.className = 'status ' + (d.online ? 'online' : 'offline');
+    el.textContent = d.online ? '✅ 主机已在线' : '💤 主机离线';
+    if (d.ping_ms) el.textContent += ` (${d.ping_ms}ms)`;
+  } catch { el.textContent = '⚠️ 无法获取状态'; }
+}
+async function wake() {
+  const btn = document.getElementById('wakeBtn');
+  const el = document.getElementById('status');
+  btn.disabled = true; el.className = 'status sending'; el.textContent = '⏳ 正在发送唤醒包...';
+  try {
+    const r = await fetch('/wake', { method: 'POST' });
+    const d = await r.json();
+    if (d.success) {
+      btn.className = 'btn wake sent'; el.className = 'status online';
+      el.textContent = '✅ 唤醒包已发送，等待开机...';
+      btn.textContent = '已发送';
+      setTimeout(() => { btn.className = 'btn wake'; btn.textContent = '开 机'; btn.disabled = false; checkStatus(); }, 3000);
+    } else { throw new Error(d.message); }
+  } catch(e) {
+    el.className = 'status offline'; el.textContent = '⚠️ 发送失败: ' + e.message;
+    btn.disabled = false;
+  }
+}
+checkStatus();
+setInterval(checkStatus, 15000);
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# WOL Web systemd 服务模板（随 release 分发，占位符需按环境替换）
+#
+# 这是 apply 给使用者的参考单元。实际部署建议用 deploy/install.sh 自动生成，
+# 它会根据实际安装目录、用户和 .env 位置填充：User / WorkingDirectory / ExecStart / EnvironmentFile。
+#
+# 手动参考：
+#   User=<运行用户>
+#   WorkingDirectory=<包含 wol-web 二进制的目录>
+#   ExecStart=<目录>/wol-web
+#   EnvironmentFile=<目录>/.env     （凭据不写死在 unit 中）
+
+[Unit]
+Description=WOL Web - Remote Wake-on-LAN (Go)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<USER>
+WorkingDirectory=/path/to/wol-web
+ExecStart=/path/to/wol-web/wol-web
+EnvironmentFile=/path/to/wol-web/.env
+Restart=always
+RestartSec=5
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

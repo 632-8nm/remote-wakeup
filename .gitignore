@@ -1,0 +1,17 @@
+# Go 编译产物
+/wol-web
+
+# 本地凭据（绝不提交真实值）
+.env
+.env.*
+!.env.example
+*.db
+
+# 打包/临时产物
+*.zip
+*.tar.gz
+*.bak
+*.old*
+
+# 编辑器/系统
+.DS_Store

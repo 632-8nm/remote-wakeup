@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 - 远程开机</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100dvh; padding: 1rem;
+  }
+  .card {
+    background: #1e293b; border-radius: 1.5rem; padding: 2.5rem 2rem;
+    text-align: center; max-width: 360px; width: 100%;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  }
+  h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: .25rem; }
+  p.sub { color: #94a3b8; font-size: .875rem; margin-bottom: 2rem; }
+  .field {
+    width: 100%; padding: .75rem 1rem; margin-bottom: .75rem;
+    border: 1px solid #334155; border-radius: .75rem;
+    background: #0f172a; color: #e2e8f0; font-size: 1rem;
+    outline: none; transition: border-color .2s;
+  }
+  .field:focus { border-color: #3b82f6; }
+  .btn {
+    width: 100%; padding: .75rem; border: none; border-radius: .75rem;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #fff; font-size: 1rem; font-weight: 600;
+    cursor: pointer; transition: opacity .2s;
+  }
+  .btn:hover { opacity: .9; }
+  .error { color: #ef4444; font-size: .875rem; margin-bottom: .75rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔐 远程开机</h1>
+  <p class="sub">请先登录</p>
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <form method="post">
+    <input class="field" type="text" name="username" placeholder="用户名" required autofocus>
+    <input class="field" type="password" name="password" placeholder="密码" required>
+    <button class="btn" type="submit">登 录</button>
+  </form>
+</div>
+</body>
+</html>
