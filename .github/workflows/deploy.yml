@@ -1,0 +1,30 @@
+name: Deploy
+
+# push 到 main 时自动部署到板端
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to board
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to board and deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 192.168.124.7
+          username: orangepi
+          key: ${{ secrets.BOARD_SSH_KEY }}
+          port: 22
+          timeout: 30s
+          script: |
+            set -e
+            echo "==> 板端自动部署开始"
+            cd /home/orangepi/project/remote-wakeup
+            echo "==> git pull"
+            git pull --ff-only
+            echo "==> 运行 dev.sh (构建并重启服务)"
+            ./dev.sh
+            echo "==> 部署完成"
