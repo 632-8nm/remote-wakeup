@@ -94,7 +94,7 @@ jobs:
             exit 1
           fi
 
-          DEPLOY_DIR=/home/orangepi/project/remote-wakeup
+          DEPLOY_DIR=/opt/wol-web
 
           echo "==> 先停止 wol-web 服务（释放二进制占用）"
           ssh -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
