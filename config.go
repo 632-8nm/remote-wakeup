@@ -12,14 +12,15 @@ import (
 // Config holds all runtime configuration. Values are resolved in this order:
 // explicit Config overrides > environment variable > .env file > default.
 type Config struct {
-	MAC        string
-	Broadcast  string
-	WOLPort    int
-	TargetIP   string
-	AdminPass  string
-	SecretKey  string
-	SessionTTL time.Duration
-	Port       string
+	MAC           string
+	Broadcast     string
+	WOLPort       int
+	TargetIP      string
+	AdminPass     string
+	SecretKey     string
+	SessionTTL    time.Duration
+	Port          string
+	AllowedOrigins string // 逗号分隔的可信跨站来源（如 https://wol.example.com）
 }
 
 // loadEnv reads a simple KEY=VALUE dotfile (like .env) into the process
@@ -71,6 +72,7 @@ func (c *Config) resolve() {
 	c.TargetIP = os.Getenv("TARGET_IP")
 	c.AdminPass = os.Getenv("ADMIN_PASSWORD")
 	c.SecretKey = os.Getenv("SECRET_KEY")
+	c.AllowedOrigins = os.Getenv("ALLOWED_ORIGINS")
 
 	if v := os.Getenv("WOL_BROADCAST"); v != "" {
 		c.Broadcast = v

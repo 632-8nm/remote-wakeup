@@ -34,13 +34,20 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	type page struct{ Error string }
 	if r.Method == http.MethodPost {
+		ip := clientIP(r)
+		if loginThrottled(ip) {
+			serveRender(w, "login.html", page{"尝试次数过多，请稍后再试"})
+			return
+		}
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 		if username == "admin" && authPass(password) {
+			loginSucceeded(ip)
 			sess.Issue(w, "admin")
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
+		loginFailed(ip)
 		serveRender(w, "login.html", page{"用户名或密码错误"})
 		return
 	}

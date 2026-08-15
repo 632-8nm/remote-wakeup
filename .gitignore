@@ -1,5 +1,6 @@
 # Go 编译产物
 /wol-web
+/remote-wakeup
 
 # 本地凭据（绝不提交真实值）
 .env

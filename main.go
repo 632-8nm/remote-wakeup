@@ -25,8 +25,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logoutHandler)
-	mux.HandleFunc("/wake", loginRequired(wakeHandler))
-	mux.HandleFunc("/status", loginRequired(statusHandler))
+	mux.HandleFunc("/wake", loginRequired(csrfProtect(wakeHandler)))
+	mux.HandleFunc("/status", loginRequired(csrfProtect(statusHandler)))
 	mux.HandleFunc("/", indexHandler)
 
 	addr := "0.0.0.0:" + cfg.Port
