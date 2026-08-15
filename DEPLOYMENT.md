@@ -87,6 +87,29 @@ cat ~/.ssh/deploy.pub >> ~/.ssh/authorized_keys
 # 创建生产部署目录
 sudo mkdir -p /opt/wol-web
 sudo chown orangepi:orangepi /opt/wol-web
+
+# 配置 systemd 服务
+sudo tee /etc/systemd/system/wol-web.service <<'EOF'
+[Unit]
+Description=WOL Web - Remote Wake-on-LAN (Go)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orangepi
+WorkingDirectory=/opt/wol-web
+ExecStart=/opt/wol-web/wol-web
+EnvironmentFile=/opt/wol-web/.env
+Restart=always
+RestartSec=5
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now wol-web
 ```
 
 ### 6.2 Cloudflare 配置
