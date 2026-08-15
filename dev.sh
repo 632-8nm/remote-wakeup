@@ -94,7 +94,7 @@ sleep 1
 
 # 5) 验证
 if systemctl --quiet is-active "$SVC_NAME"; then
-  PORT="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2- | head -1)"
+  PORT="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2- | head -1 || true)"
   [ -z "$PORT" ] && PORT=5000
   echo "✓ 服务已启动（http://<本机IP>:$PORT）"
 else
