@@ -1,6 +1,6 @@
 name: Deploy
 
-# push 到 main 时自动部署到板端
+# push 到 main 时自动部署到板端（经 Cloudflare Tunnel SSH 隧道）
 on:
   push:
     branches:
@@ -11,15 +11,46 @@ jobs:
     name: Deploy to board
     runs-on: ubuntu-latest
     steps:
-      - name: SSH to board and deploy
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ssh.632-8nm.cloud
-          username: orangepi
-          key: ${{ secrets.BOARD_SSH_KEY }}
-          port: 22
-          timeout: 30s
-          script: |
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+          chmod +x /usr/local/bin/cloudflared
+          cloudflared --version
+
+      - name: Write board SSH key
+        run: |
+          echo "$BOARD_SSH_KEY" > /tmp/board_key
+          chmod 600 /tmp/board_key
+        env:
+          BOARD_SSH_KEY: ${{ secrets.BOARD_SSH_KEY }}
+
+      - name: Deploy via Cloudflare Tunnel SSH
+        run: |
+          set -e
+          # 解析 Service Token (格式: ID:SECRET)
+          CF_ID="${CLOUDFLARED_TOKEN%%:*}"
+          CF_SECRET="${CLOUDFLARED_TOKEN#*:}"
+
+          # 启动 cloudflared access tcp 转发: 本地 2222 -> Cloudflare 边缘 -> 板子 sshd
+          cloudflared access tcp \
+            --hostname ssh.632-8nm.cloud \
+            --url localhost:2222 \
+            --service-token-id "$CF_ID" \
+            --service-token-secret "$CF_SECRET" \
+            --log-level warn > /tmp/cf-tcp.log 2>&1 &
+          CF_PID=$!
+          trap "kill $CF_PID 2>/dev/null || true" EXIT
+
+          # 等待转发就绪
+          for i in $(seq 1 15); do
+            ss -tln 2>/dev/null | grep -q 2222 && break
+            sleep 1
+          done
+
+          # 通过转发端口 SSH 执行部署
+          echo "==> SSH 连接板子并部署"
+          ssh -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 -p 2222 orangepi@127.0.0.1 '
             set -e
             echo "==> 板端自动部署开始"
             cd /home/orangepi/project/remote-wakeup
@@ -28,3 +59,6 @@ jobs:
             echo "==> 运行 dev.sh (构建并重启服务)"
             ./dev.sh
             echo "==> 部署完成"
+          '
+        env:
+          CLOUDFLARED_TOKEN: ${{ secrets.CLOUDFLARED_TOKEN }}
