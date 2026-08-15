@@ -1,16 +1,53 @@
-name: Deploy
+name: Build & Deploy
 
-# push 到 main 时自动部署到板端（经 Cloudflare Tunnel SSH 隧道）
+# push 到 main 时云端交叉编译并 SSH 部署到板端（经 Cloudflare Tunnel）
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy to board
+  build:
+    name: Build arm64 binary
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Vet & Test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Cross-compile for arm64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o wol-web ./cmd/wol-web
+          file wol-web
+          chmod +x wol-web
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: wol-web
+          path: wol-web
+          retention-days: 1
+
+  deploy:
+    name: Deploy to board
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: wol-web
+          path: .
+
       - name: Install cloudflared
         run: |
           curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
@@ -24,14 +61,13 @@ jobs:
         env:
           BOARD_SSH_KEY: ${{ secrets.BOARD_SSH_KEY }}
 
-      - name: Deploy via Cloudflare Tunnel SSH
+      - name: Copy binary and restart via Cloudflare Tunnel SSH
         run: |
           set -e
-          # 解析 Service Token (格式: ID:SECRET)
           CF_ID="${CLOUDFLARED_TOKEN%%:*}"
           CF_SECRET="${CLOUDFLARED_TOKEN#*:}"
 
-          # 启动 cloudflared access tcp 转发: 本地 2222 -> Cloudflare 边缘 -> 板子 sshd
+          # 启动 cloudflared access tcp 转发
           cloudflared access tcp \
             --hostname ssh.632-8nm.cloud \
             --url localhost:2222 \
@@ -41,8 +77,8 @@ jobs:
           CF_PID=$!
           trap "kill $CF_PID 2>/dev/null || true" EXIT
 
-          # 等待转发就绪（重试 SSH 连接，不依赖 ss 命令）
-          echo "==> 等待隧道就绪并 SSH 连接板子"
+          # 等待隧道就绪（SSH 重试）
+          echo "==> 等待隧道就绪"
           SSH_OK=0
           for i in $(seq 1 15); do
             if ssh -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
@@ -58,18 +94,30 @@ jobs:
             exit 1
           fi
 
-          # 通过转发端口 SSH 执行部署
-          echo "==> 执行部署"
+          DEPLOY_DIR=/home/orangepi/project/remote-wakeup
+
+          echo "==> 先停止 wol-web 服务（释放二进制占用）"
           ssh -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
-              -o ConnectTimeout=15 -p 2222 orangepi@127.0.0.1 '
+              -o ConnectTimeout=15 -p 2222 orangepi@127.0.0.1 "
             set -e
-            echo "==> 板端自动部署开始"
-            cd /home/orangepi/project/remote-wakeup
-            echo "==> git pull"
-            git pull --ff-only
-            echo "==> 运行 dev.sh (构建并重启服务)"
-            ./dev.sh
-            echo "==> 部署完成"
-          '
+            sudo systemctl stop wol-web || true
+            echo 'wol-web 已停止'
+          "
+
+          echo "==> 传输 wol-web 二进制到板子"
+          scp -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 -P 2222 wol-web orangepi@127.0.0.1:$DEPLOY_DIR/
+
+          echo "==> SSH 启动 wol-web 服务"
+          ssh -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 -p 2222 orangepi@127.0.0.1 "
+            set -e
+            echo '==> 替换二进制'
+            chmod +x $DEPLOY_DIR/wol-web
+            sudo systemctl start wol-web
+            sleep 2
+            echo '==> 服务状态: '\$(systemctl is-active wol-web)
+            sudo systemctl is-active wol-web
+          "
         env:
           CLOUDFLARED_TOKEN: ${{ secrets.CLOUDFLARED_TOKEN }}
