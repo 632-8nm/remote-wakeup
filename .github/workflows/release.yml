@@ -1,0 +1,74 @@
+name: Release
+
+# 打 tag 时自动触发（语义化版本，如 v1.0.0）
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # 允许发布 GitHub Release
+
+jobs:
+  build:
+    name: build-${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build -trimpath -ldflags "-s -w" -o dist/wol-web-${{ matrix.goos }}-${{ matrix.goarch }} .
+
+      - name: Package zip
+        run: |
+          mkdir -p pkg/wol-web
+          cp dist/wol-web-${{ matrix.goos }}-${{ matrix.goarch }} pkg/wol-web/wol-web
+          cp .env.example install.sh wol-web.service README.md pkg/wol-web/
+          chmod +x pkg/wol-web/wol-web pkg/wol-web/install.sh
+          cd pkg && zip -r ../wol-web-${{ matrix.goos }}-${{ matrix.goarch }}.zip wol-web
+          cd ..
+          sha256sum wol-web-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wol-web-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: wol-web-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect zip files
+        run: |
+          mkdir -p release-assets
+          find artifacts -name '*.zip' -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*.zip
+          generate_release_notes: true
