@@ -15,55 +15,64 @@ Cloudflare Tunnel / 局域网 IP
 本服务（WOL Web）  ── WOL Magic Packet ──►  目标电脑（Windows / 任意 WOL 设备）
 ```
 
-- 登录(密码)后即可一键发送 WOL 魔术包唤醒目标电脑。
-- 首页自动轮询目标电脑的 ping 状态,显示**在线 / 离线**。
-- 可配合 [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) 将页面暴露到公网域名。
+- 登录(密码)后一键发送 WOL 魔术包唤醒目标电脑;首页自动轮询目标 ping 状态,显示**在线 / 离线**。
+- 主要使用方式是通过 [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) 暴露到公网域名,手机浏览器即可访问。
 
 ## 特性
 
 - ✅ 登录保护(恒定时间密码比较,`crypto/subtle`)
 - ✅ 会话签名 Cookie(无数据库、服务端零存储)
 - ✅ 一键 WOL 唤醒 + 实时在线状态(ping)
-- ✅ 单静态二进制,一个文件即可运行
-- ✅ 零第三方依赖,纯 Go 标准库
+- ✅ 单静态二进制,一个文件即可运行;零第三方依赖,纯 Go 标准库
 - ✅ 前端页面经 `go:embed` 打包进二进制,无额外模板文件
 - ✅ 配置通过 `.env` 或环境变量,**仓库不含任何真实凭据**
 
+## Cloudflare Tunnel(公网接入)
+
+通过 Cloudflare Tunnel 把本服务暴露到公网域名,无需公网 IP / 端口转发。
+步骤如下:
+
+1. **前提**:域名已托管在 Cloudflare;登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com)。
+2. **板子装 cloudflared**:官方脚本装 `cloudflared`(arm64 版),`cloudflared --version` 验证。
+3. **创建隧道**:Zero Trust → **Networks → Tunnels** → Create a tunnel → 选 Cloudflared → 记下 token。
+4. **接入隧道**:`cloudflared tunnel run --token <TOKEN>`(先前台测试,确认 `Registered tunnel connection`)。
+5. **配域名**:Tunnel 页 → Public Hostname → Add;Service 类型 `HTTP`、URL `localhost:5000`。
+6. **常驻**:`sudo cloudflared service install <TOKEN>` + `systemctl enable --now cloudflared`。
+7. **验证**:浏览器打开 `https://你的域名`,应能登录并看到在线状态。
+8. **(可选)** Cloudflare Access 中为域名加一条 Access 策略,做二次访问保护。
+
 ## 快速开始
 
-### 方式一:直接运行二进制
+本项目按"启动方式"分两种,配置项见下节(两方式所需配置相同)。
+
+### 方式一:从源码构建
 
 ```bash
-# 下载 release 中的 wol-web(或自己编译):
 git clone https://github.com/632-8nm/remote-wakeup.git
 cd remote-wakeup
-go build -o wol-web .          # 当前平台编译
-
+go build -o wol-web .                    # 当前平台编译
 # 交叉编译到 aarch64 板子:
 # GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o wol-web .
+./wol-web                                # 配置见下节，监听 5000
 ```
 
-配置(环境变量或 `.env`,二选一):
+### 方式二:下载预编译二进制
+
+从 GitHub Release 下载预编译好的 zip(内含 `wol-web`、`.env.example`、`dev.sh`):
 
 ```bash
-export WOL_MAC=AA:BB:CC:DD:EE:FF      # 目标电脑 MAC(必填)
-export TARGET_IP=192.168.1.100        # 目标电脑 IP(必填,用于 ping 检测)
-export ADMIN_PASSWORD=你的密码         # 登录密码(必填)
-./wol-web                            # 监听 5000
-```
-
-### 方式二:一键部署为 systemd(扁平发布包) 
-
-Release 提供扁平 zip,三个文件同级:`wol-web`、`.env.example`、`install.sh`。
-
-```bash
+# 下载 release 中的 wol-web-vX.Y.Z-linux-arm64.zip 并解压
 unzip wol-web-vX.Y.Z-linux-arm64.zip
 cd <解压目录>
-cp .env.example .env        # 填写 WOL_MAC / TARGET_IP / ADMIN_PASSWORD
-./install.sh                 # 自动注册 systemd 服务并启动
+cp .env.example .env      # 编辑 .env 填写配置(见下节)
+./dev.sh                  # 注册 systemd 服务并启动
 ```
 
+> `dev.sh` 自适应:目录中有源码(go.mod)时先构建再部署;只有预编译二进制时直接部署。
+
 ## 配置(环境变量)
+
+必填三项,其余可选。可用环境变量注入,或写入 `.env`(方式二用 `.env`)。
 
 | 变量 | 必填 | 默认 | 说明 |
 |---|---|---|---|
@@ -79,7 +88,11 @@ cp .env.example .env        # 填写 WOL_MAC / TARGET_IP / ADMIN_PASSWORD
 ## 更新(已有部署的板子)
 
 ```bash
-./update.sh     # 从 GitHub Release 拉最新二进制并重启服务
+# 源码用户：更新代码后重新构建并重启
+./dev.sh
+
+# release 用户：下载新 release zip 解压，覆盖 wol-web 后用 dev.sh 重启
+./dev.sh
 ```
 
 ## systemd 服务
@@ -96,23 +109,12 @@ sudo systemctl enable --now wol-web
 
 ### 修改密码
 
+直接编辑 `.env` 中的 `ADMIN_PASSWORD`,然后重启服务生效:
+
 ```bash
-./change-password.sh    # 交互式更新 .env 中的密码
+# 编辑 .env 中的 ADMIN_PASSWORD=新密码，然后：
+sudo systemctl restart wol-web
 ```
-
-## Cloudflare Tunnel(可选公网接入)
-
-在 Cloudflare Zero Trust Dashboard 建 Public Hostname,指向 `http://localhost:5000`;
-或 `~/.cloudflared/config.yml`:
-
-```yaml
-ingress:
-  - hostname: wol.example.com
-    service: http://localhost:5000
-  - service: http_status:404
-```
-
-可叠加 Cloudflare Access 策略做二次保护。
 
 ## 安全说明
 
@@ -126,9 +128,8 @@ ingress:
 .
 ├── main.go / config.go / handlers.go / session.go / wol.go / templates.go / util.go
 ├── templates/            # 前端页面(go:embed)
-├── deploy 相关脚本已扁平到根:install.sh / update.sh / wol-web.service
+├── dev.sh                # 部署脚本（自适应：源码构建或预编译二进制）
 ├── .env.example          # 配置模板
-├── change-password.sh
 └── wol-web.service       # systemd 模板
 ```
 
