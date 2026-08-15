@@ -39,8 +39,8 @@ jobs:
         run: |
           mkdir -p pkg/wol-web
           cp dist/wol-web-${{ matrix.goos }}-${{ matrix.goarch }} pkg/wol-web/wol-web
-          cp .env.example install.sh wol-web.service README.md pkg/wol-web/
-          chmod +x pkg/wol-web/wol-web pkg/wol-web/install.sh
+          cp .env.example dev.sh wol-web.service README.md pkg/wol-web/
+          chmod +x pkg/wol-web/wol-web pkg/wol-web/dev.sh
           cd pkg && zip -r ../wol-web-${{ matrix.goos }}-${{ matrix.goarch }}.zip wol-web
           cd ..
           sha256sum wol-web-${{ matrix.goos }}-${{ matrix.goarch }}.zip
