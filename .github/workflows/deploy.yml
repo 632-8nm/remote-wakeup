@@ -41,14 +41,25 @@ jobs:
           CF_PID=$!
           trap "kill $CF_PID 2>/dev/null || true" EXIT
 
-          # 等待转发就绪
+          # 等待转发就绪（重试 SSH 连接，不依赖 ss 命令）
+          echo "==> 等待隧道就绪并 SSH 连接板子"
+          SSH_OK=0
           for i in $(seq 1 15); do
-            ss -tln 2>/dev/null | grep -q 2222 && break
+            if ssh -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+                -o ConnectTimeout=10 -p 2222 orangepi@127.0.0.1 'true' 2>/dev/null; then
+              SSH_OK=1
+              break
+            fi
             sleep 1
           done
+          if [ "$SSH_OK" != "1" ]; then
+            echo "错误: 无法通过隧道连接板子，cloudflared 日志:"
+            cat /tmp/cf-tcp.log
+            exit 1
+          fi
 
           # 通过转发端口 SSH 执行部署
-          echo "==> SSH 连接板子并部署"
+          echo "==> 执行部署"
           ssh -i /tmp/board_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
               -o ConnectTimeout=15 -p 2222 orangepi@127.0.0.1 '
             set -e
