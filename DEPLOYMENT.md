@@ -1,134 +1,107 @@
-# 部署架构与搭建流程（remote-wakeup）
-
-> 本文档记录本项目从零搭建的完整流程与当前生产架构，供维护者参考。
-> 敏感信息一律使用占位符，不包含真实 token / 密码。
-
-## 1. 整体架构
+﻿# 閮ㄧ讲鏋舵瀯涓庢惌寤烘祦绋嬶紙remote-wakeup锛?
+> 鏈枃妗ｈ褰曟湰椤圭洰浠庨浂鎼缓鐨勫畬鏁存祦绋嬩笌褰撳墠鐢熶骇鏋舵瀯锛屼緵缁存姢鑰呭弬鑰冦€?> 鏁忔劅淇℃伅涓€寰嬩娇鐢ㄥ崰浣嶇锛屼笉鍖呭惈鐪熷疄 token / 瀵嗙爜銆?
+## 1. 鏁翠綋鏋舵瀯
 
 ```
-开发者本地 (Windows)
-   │  写代码 → go vet / go test（本地自测）
-   │  git commit + push
-   ▼
-GitHub (remote-wakeup 仓库)
-   │  触发 GitHub Actions（workflow: deploy.yml）
-   ▼
-CI/CD（GitHub 云端 runner，ubuntu-latest）
-   │  ① go vet ./... + go test ./...（质量门禁）
-   │  ② 交叉编译 arm64 二进制（CGO_ENABLED=0 GOOS=linux GOARCH=arm64）
-   │  ③ 通过 Cloudflare Tunnel (ssh.632-8nm.cloud) SSH 到板子
-   ▼
-板子（Orange Pi Zero 3）
-   │  停服务 → scp 二进制 → 重启
-   ▼
-/opt/wol-web/wol-web  （systemd: wol-web，监听 :5000）
-```
+寮€鍙戣€呮湰鍦?(Windows)
+   鈹? 鍐欎唬鐮?鈫?go vet / go test锛堟湰鍦拌嚜娴嬶級
+   鈹? git commit + push
+   鈻?GitHub (remote-wakeup 浠撳簱)
+   鈹? 瑙﹀彂 GitHub Actions锛坵orkflow: deploy.yml锛?   鈻?CI/CD锛圙itHub 浜戠 runner锛寀buntu-latest锛?   鈹? 鈶?go vet ./... + go test ./...锛堣川閲忛棬绂侊級
+   鈹? 鈶?浜ゅ弶缂栬瘧 arm64 浜岃繘鍒讹紙CGO_ENABLED=0 GOOS=linux GOARCH=arm64锛?   鈹? 鈶?閫氳繃 Cloudflare Tunnel (ssh.<your-domain>) SSH 鍒版澘瀛?   鈻?鏉垮瓙锛圤range Pi Zero 3锛?   鈹? 鍋滄湇鍔?鈫?scp 浜岃繘鍒?鈫?閲嶅惎
+   鈻?/opt/wol-web/wol-web  锛坰ystemd: wol-web锛岀洃鍚?:5000锛?```
 
-## 2. 生产部署位置
+## 2. 鐢熶骇閮ㄧ讲浣嶇疆
 
-| 项 | 值 |
+| 椤?| 鍊?|
 |---|---|
-| 部署目录 | `/opt/wol-web/` |
-| 二进制 | `/opt/wol-web/wol-web` |
-| 配置 | `/opt/wol-web/.env`（权限 600） |
-| systemd 服务 | `wol-web.service` |
-| 监听端口 | `5000` |
-| 公网入口 | `remote-wakeup.632-8nm.cloud`（Cloudflare 隧道 → http://localhost:5000） |
-| CI 部署入口 | `ssh.632-8nm.cloud`（Cloudflare 隧道 → ssh://localhost:22） |
+| 閮ㄧ讲鐩綍 | `/opt/wol-web/` |
+| 浜岃繘鍒?| `/opt/wol-web/wol-web` |
+| 閰嶇疆 | `/opt/wol-web/.env`锛堟潈闄?600锛?|
+| systemd 鏈嶅姟 | `wol-web.service` |
+| 鐩戝惉绔彛 | `5000` |
+| 鍏綉鍏ュ彛 | `remote-wakeup.<your-domain>`锛圕loudflare 闅ч亾 鈫?http://localhost:5000锛?|
+| CI 閮ㄧ讲鍏ュ彛 | `ssh.<your-domain>`锛圕loudflare 闅ч亾 鈫?ssh://localhost:22锛?|
 
-## 3. 板子侧组件
-
-| 组件 | 说明 | 状态 |
+## 3. 鏉垮瓙渚х粍浠?
+| 缁勪欢 | 璇存槑 | 鐘舵€?|
 |---|---|---|
-| `cloudflared` | Cloudflare 隧道客户端（token 模式） | systemd 服务，常驻 |
-| `/opt/wol-web/` | 生产部署目录（root 属主，二进制 750 / .env 600） | 由 CI 更新 |
-| `wol-web.service` | systemd 单元，指向 `/opt/wol-web/wol-web` | 常驻 |
+| `cloudflared` | Cloudflare 闅ч亾瀹㈡埛绔紙token 妯″紡锛?| systemd 鏈嶅姟锛屽父椹?|
+| `/opt/wol-web/` | 鐢熶骇閮ㄧ讲鐩綍锛坮oot 灞炰富锛屼簩杩涘埗 750 / .env 600锛?| 鐢?CI 鏇存柊 |
+| `wol-web.service` | systemd 鍗曞厓锛屾寚鍚?`/opt/wol-web/wol-web` | 甯搁┗ |
 
-## 4. Cloudflare 侧配置
-
-| 项 | 配置 | 用途 |
+## 4. Cloudflare 渚ч厤缃?
+| 椤?| 閰嶇疆 | 鐢ㄩ€?|
 |---|---|---|
-| 域名 | `632-8nm.cloud` | 托管在 Cloudflare |
-| 隧道 | token 模式（tunnel run --token） | 板子主动连 Cloudflare |
-| Public Hostname | `remote-wakeup.632-8nm.cloud` → `http://localhost:5000` | 公网访问 Web |
-| Public Hostname | `ssh.632-8nm.cloud` → `ssh://localhost:22` | CI/CD 部署 SSH 入口 |
-| Service Token | 在 Access → Service Auth 创建 | CI 认证（格式 ID:SECRET） |
-| Access 策略 | `ci-deploy`（Service Auth + token） | 放行 CI 的 cloudflared 连接 |
+| 鍩熷悕 | `<your-domain>` | 鎵樼鍦?Cloudflare |
+| 闅ч亾 | token 妯″紡锛坱unnel run --token锛?| 鏉垮瓙涓诲姩杩?Cloudflare |
+| Public Hostname | `remote-wakeup.<your-domain>` 鈫?`http://localhost:5000` | 鍏綉璁块棶 Web |
+| Public Hostname | `ssh.<your-domain>` 鈫?`ssh://localhost:22` | CI/CD 閮ㄧ讲 SSH 鍏ュ彛 |
+| Service Token | 鍦?Access 鈫?Service Auth 鍒涘缓 | CI 璁よ瘉锛堟牸寮?ID:SECRET锛?|
+| Access 绛栫暐 | `ci-deploy`锛圫ervice Auth + token锛?| 鏀捐 CI 鐨?cloudflared 杩炴帴 |
 
-## 5. GitHub 侧配置
-
-| 项 | 值 | 说明 |
+## 5. GitHub 渚ч厤缃?
+| 椤?| 鍊?| 璇存槑 |
 |---|---|---|
-| 仓库 | `632-8nm/remote-wakeup` | — |
-| Workflow | `.github/workflows/deploy.yml` | push main 触发 |
-| Workflow | `.github/workflows/release.yml` | 打 v* tag 触发，发布 Release |
-| Secret: `BOARD_SSH_KEY` | 板子 `~/.ssh/deploy` 私钥 | 云端 SSH 登录板子 |
-| Secret: `CLOUDFLARED_TOKEN` | `ClientID:ClientSecret` | cloudflared access 认证 |
+| 浠撳簱 | `632-8nm/remote-wakeup` | 鈥?|
+| Workflow | `.github/workflows/deploy.yml` | push main 瑙﹀彂 |
+| Workflow | `.github/workflows/release.yml` | 鎵?v* tag 瑙﹀彂锛屽彂甯?Release |
+| Secret: `BOARD_SSH_KEY` | 鏉垮瓙 `~/.ssh/deploy` 绉侀挜 | 浜戠 SSH 鐧诲綍鏉垮瓙 |
+| Secret: `CLOUDFLARED_TOKEN` | `ClientID:ClientSecret` | cloudflared access 璁よ瘉 |
 
-## 6. 从零搭建步骤
+## 6. 浠庨浂鎼缓姝ラ
 
-### 6.1 板子准备
+### 6.1 鏉垮瓙鍑嗗
 ```bash
-# 安装 cloudflared
+# 瀹夎 cloudflared
 curl -L --output /usr/local/bin/cloudflared \
   https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64
 chmod +x /usr/local/bin/cloudflared
 
-# 配置免密 sudo（仅 systemctl/journalctl/tee，供 CI 使用）
-sudo tee /etc/sudoers.d/orangepi-systemd <<'EOF'
+# 閰嶇疆鍏嶅瘑 sudo锛堜粎 systemctl/journalctl/tee锛屼緵 CI 浣跨敤锛?sudo tee /etc/sudoers.d/orangepi-systemd <<'EOF'
 orangepi ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /bin/systemctl, /usr/bin/journalctl, /usr/bin/tee
 EOF
 sudo chmod 440 /etc/sudoers.d/orangepi-systemd
 
-# 生成 CI 部署密钥
+# 鐢熸垚 CI 閮ㄧ讲瀵嗛挜
 ssh-keygen -t ed25519 -N "" -f ~/.ssh/deploy
 cat ~/.ssh/deploy.pub >> ~/.ssh/authorized_keys
 
-# 创建生产部署目录
+# 鍒涘缓鐢熶骇閮ㄧ讲鐩綍
 sudo mkdir -p /opt/wol-web
 sudo chown orangepi:orangepi /opt/wol-web
 ```
 
-### 6.2 Cloudflare 配置
-1. 域名托管在 Cloudflare（`632-8nm.cloud`）
-2. 板子安装 cloudflared，用 token 接入隧道
-3. 加 Public Hostname：
-   - `remote-wakeup.632-8nm.cloud` → `http://localhost:5000`
-   - `ssh.632-8nm.cloud` → `ssh://localhost:22`
-4. Access → Service Auth 创建 Service Token（记下 Client ID/Secret）
-5. Access → 为 `ssh.632-8nm.cloud` 配置 `ci-deploy` 策略（Service Auth）
-
-### 6.3 GitHub 配置
-1. 仓库加两个 Secret：
-   - `BOARD_SSH_KEY` = 板子 `~/.ssh/deploy` 私钥全文
+### 6.2 Cloudflare 閰嶇疆
+1. 鍩熷悕鎵樼鍦?Cloudflare锛坄<your-domain>`锛?2. 鏉垮瓙瀹夎 cloudflared锛岀敤 token 鎺ュ叆闅ч亾
+3. 鍔?Public Hostname锛?   - `remote-wakeup.<your-domain>` 鈫?`http://localhost:5000`
+   - `ssh.<your-domain>` 鈫?`ssh://localhost:22`
+4. Access 鈫?Service Auth 鍒涘缓 Service Token锛堣涓?Client ID/Secret锛?5. Access 鈫?涓?`ssh.<your-domain>` 閰嶇疆 `ci-deploy` 绛栫暐锛圫ervice Auth锛?
+### 6.3 GitHub 閰嶇疆
+1. 浠撳簱鍔犱袱涓?Secret锛?   - `BOARD_SSH_KEY` = 鏉垮瓙 `~/.ssh/deploy` 绉侀挜鍏ㄦ枃
    - `CLOUDFLARED_TOKEN` = `ClientID:ClientSecret`
-2. 推送 `.github/workflows/deploy.yml`（push main 自动部署）
-3. 推送 `.github/workflows/release.yml`（打 tag 自动构建 Release）
-
-### 6.4 验证
+2. 鎺ㄩ€?`.github/workflows/deploy.yml`锛坧ush main 鑷姩閮ㄧ讲锛?3. 鎺ㄩ€?`.github/workflows/release.yml`锛堟墦 tag 鑷姩鏋勫缓 Release锛?
+### 6.4 楠岃瘉
 ```bash
-# 在板子测试隧道 SSH（模拟 CI）
-cloudflared access tcp --hostname ssh.632-8nm.cloud --url localhost:2222 \
+# 鍦ㄦ澘瀛愭祴璇曢毀閬?SSH锛堟ā鎷?CI锛?cloudflared access tcp --hostname ssh.<your-domain> --url localhost:2222 \
   --service-token-id <ID> --service-token-secret <SECRET> &
 ssh -i ~/.ssh/deploy -p 2222 orangepi@127.0.0.1 'echo OK'
 ```
-推一次代码到 main，观察 GitHub Actions 的 Deploy 是否 success，板子服务是否更新。
-
-## 7. 日常维护
+鎺ㄤ竴娆′唬鐮佸埌 main锛岃瀵?GitHub Actions 鐨?Deploy 鏄惁 success锛屾澘瀛愭湇鍔℃槸鍚︽洿鏂般€?
+## 7. 鏃ュ父缁存姢
 
 ```bash
-# 查看服务
+# 鏌ョ湅鏈嶅姟
 systemctl status wol-web
-# 查看日志
+# 鏌ョ湅鏃ュ織
 journalctl -u wol-web -f
-# 手动重启
+# 鎵嬪姩閲嶅惎
 sudo systemctl restart wol-web
-# 改配置（.env）
-sudo nano /opt/wol-web/.env && sudo systemctl restart wol-web
+# 鏀归厤缃紙.env锛?sudo nano /opt/wol-web/.env && sudo systemctl restart wol-web
 ```
 
-## 8. 回滚
+## 8. 鍥炴粴
 
-CI 部署的是云端编译的固定版本二进制。回滚方式：
-- 用 `git revert` 回退代码后 push（触发重新部署旧版）
-- 或手动替换 `/opt/wol-web/wol-web` 为上一版二进制并重启
+CI 閮ㄧ讲鐨勬槸浜戠缂栬瘧鐨勫浐瀹氱増鏈簩杩涘埗銆傚洖婊氭柟寮忥細
+- 鐢?`git revert` 鍥為€€浠ｇ爜鍚?push锛堣Е鍙戦噸鏂伴儴缃叉棫鐗堬級
+- 鎴栨墜鍔ㄦ浛鎹?`/opt/wol-web/wol-web` 涓轰笂涓€鐗堜簩杩涘埗骞堕噸鍚?
