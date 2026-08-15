@@ -50,9 +50,9 @@ Cloudflare Tunnel / 局域网 IP
 ```bash
 git clone https://github.com/632-8nm/remote-wakeup.git
 cd remote-wakeup
-go build -o wol-web .                    # 当前平台编译
+go build -o wol-web ./cmd/wol-web        # 当前平台编译
 # 交叉编译到 aarch64 板子:
-# GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o wol-web .
+# GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o wol-web ./cmd/wol-web
 ./wol-web                                # 配置见下节，监听 5000
 ```
 
@@ -126,8 +126,12 @@ sudo systemctl restart wol-web
 
 ```
 .
-├── main.go / config.go / handlers.go / session.go / wol.go / templates.go / util.go
-├── templates/            # 前端页面(go:embed)
+├── cmd/wol-web/          # 程序入口
+├── internal/
+│   ├── config/           # 配置加载与校验
+│   ├── web/              # HTTP 服务（路由/handlers/会话/安全/模板渲染）
+│   │   └── templates/    # 前端页面(go:embed)
+│   └── wol/              # WOL 魔术包
 ├── dev.sh                # 部署脚本（自适应：源码构建或预编译二进制）
 ├── .env.example          # 配置模板
 └── wol-web.service       # systemd 模板

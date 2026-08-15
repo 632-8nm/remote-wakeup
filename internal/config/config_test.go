@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -16,8 +16,8 @@ func clearEnv() {
 	}
 }
 
-func TestDefaultConfig(t *testing.T) {
-	c := defaultConfig()
+func TestDefault(t *testing.T) {
+	c := Default()
 	if c.Broadcast != "255.255.255.255" {
 		t.Errorf("默认广播应为 255.255.255.255, 实际 %s", c.Broadcast)
 	}
@@ -32,7 +32,7 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
-func TestConfigResolveWithEnv(t *testing.T) {
+func TestResolveWithEnv(t *testing.T) {
 	clearEnv()
 	defer clearEnv()
 
@@ -45,8 +45,8 @@ func TestConfigResolveWithEnv(t *testing.T) {
 	os.Setenv("PORT", "8080")
 	os.Setenv("ALLOWED_ORIGINS", "https://wol.example.com, https://other.example.com")
 
-	c := defaultConfig()
-	c.resolve()
+	c := Default()
+	c.Resolve()
 
 	if c.MAC != "00:11:22:33:44:55" {
 		t.Errorf("MAC 解析错误: %s", c.MAC)
@@ -74,7 +74,7 @@ func TestConfigResolveWithEnv(t *testing.T) {
 	}
 }
 
-func TestConfigResolveDefaults(t *testing.T) {
+func TestResolveDefaults(t *testing.T) {
 	clearEnv()
 	defer clearEnv()
 
@@ -82,8 +82,8 @@ func TestConfigResolveDefaults(t *testing.T) {
 	os.Setenv("TARGET_IP", "192.168.1.100")
 	os.Setenv("ADMIN_PASSWORD", "secret")
 
-	c := defaultConfig()
-	c.resolve()
+	c := Default()
+	c.Resolve()
 
 	// 未设置的项应保持默认
 	if c.Broadcast != "255.255.255.255" {

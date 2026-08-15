@@ -1,4 +1,5 @@
-package main
+// Package config 负责加载与校验运行配置。
+package config
 
 import (
 	"bufio"
@@ -12,21 +13,21 @@ import (
 // Config holds all runtime configuration. Values are resolved in this order:
 // explicit Config overrides > environment variable > .env file > default.
 type Config struct {
-	MAC           string
-	Broadcast     string
-	WOLPort       int
-	TargetIP      string
-	AdminPass     string
-	SecretKey     string
-	SessionTTL    time.Duration
-	Port          string
+	MAC            string
+	Broadcast      string
+	WOLPort        int
+	TargetIP       string
+	AdminPass      string
+	SecretKey      string
+	SessionTTL     time.Duration
+	Port           string
 	AllowedOrigins string // 逗号分隔的可信跨站来源（如 https://wol.example.com）
 }
 
-// loadEnv reads a simple KEY=VALUE dotfile (like .env) into the process
+// LoadEnv reads a simple KEY=VALUE dotfile (like .env) into the process
 // environment, but only for keys not already set. Lines starting with # are
 // comments; blank lines are skipped. No quote stripping to keep it simple.
-func loadEnv(filename string) {
+func LoadEnv(filename string) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return // .env is optional
@@ -53,10 +54,10 @@ func loadEnv(filename string) {
 	}
 }
 
-// DefaultConfig returns configuration with all non-sensitive defaults applied.
+// Default returns configuration with all non-sensitive defaults applied.
 // Sensitive/required fields (MAC, TargetIP, AdminPass, SecretKey) are left
 // empty so the resolver can fail loudly when they are missing.
-func defaultConfig() *Config {
+func Default() *Config {
 	return &Config{
 		Broadcast:  "255.255.255.255",
 		WOLPort:    9,
@@ -65,9 +66,9 @@ func defaultConfig() *Config {
 	}
 }
 
-// resolve fills a Config from the current environment (which may have been
+// Resolve fills the Config from the current environment (which may have been
 // seeded from the .env file) and validates required fields.
-func (c *Config) resolve() {
+func (c *Config) Resolve() {
 	c.MAC = os.Getenv("WOL_MAC")
 	c.TargetIP = os.Getenv("TARGET_IP")
 	c.AdminPass = os.Getenv("ADMIN_PASSWORD")

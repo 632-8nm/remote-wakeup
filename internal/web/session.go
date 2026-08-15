@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"crypto/hmac"
@@ -21,6 +21,7 @@ type SessionStore struct {
 	ttl    time.Duration
 }
 
+// NewSessionStore 创建会话存储。secret 为空时自动生成随机密钥。
 func NewSessionStore(secret []byte, ttl time.Duration) SessionStore {
 	if len(secret) == 0 {
 		secret = []byte(randomHex(32))

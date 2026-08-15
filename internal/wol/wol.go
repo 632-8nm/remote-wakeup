@@ -1,4 +1,5 @@
-package main
+// Package wol 实现 Wake-on-LAN 魔术包的构造与发送。
+package wol
 
 import (
 	"fmt"

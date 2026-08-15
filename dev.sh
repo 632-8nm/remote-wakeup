@@ -49,7 +49,7 @@ done
 # 2) 自适应构建：源码场景（有 go.mod + go）则构建；否则要求已有二进制
 if [ -f "$SRC_DIR/go.mod" ] && command -v go >/dev/null 2>&1; then
   echo "==> 检测到源码（go.mod），本地构建 ..."
-  CGO_ENABLED=0 go build -trimpath -o "$BIN" .
+  CGO_ENABLED=0 go build -trimpath -o "$BIN" ./cmd/wol-web
   echo "    ✓ 构建完成: $BIN"
 else
   echo "==> 未检测到源码构建环境，使用已有二进制"

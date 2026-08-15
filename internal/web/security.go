@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ import (
 // 规则：
 //   - 无 Origin 头（非浏览器/同源工具请求）→ 放行（API/curl 场景）
 //   - Origin 存在 → 必须与请求 Host 同源，或属于显式配置的可信来源
-func originAllowed(r *http.Request) bool {
+func (s *Server) originAllowed(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return true // 无 Origin 说明不是浏览器跨站请求（curl/同源 GET 等）
@@ -26,7 +26,7 @@ func originAllowed(r *http.Request) bool {
 	}
 
 	// 显式配置的可信来源（如 Cloudflare 域名），逗号分隔
-	for _, allowed := range splitCSV(cfg.AllowedOrigins) {
+	for _, allowed := range splitCSV(s.cfg.AllowedOrigins) {
 		if strings.EqualFold(hostOf(allowed), originHost) {
 			return true
 		}
@@ -55,9 +55,9 @@ func splitCSV(s string) []string {
 }
 
 // csrfProtect 包装 POST 敏感端点，拒绝跨站来源请求。
-func csrfProtect(next http.HandlerFunc) http.HandlerFunc {
+func (s *Server) csrfProtect(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && !originAllowed(r) {
+		if r.Method == http.MethodPost && !s.originAllowed(r) {
 			writeJSON(w, http.StatusForbidden, map[string]any{
 				"success": false, "message": "跨站请求被拒绝",
 			})
